@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="narrow">
+  <h1>{{ title }}</h1>
+  <p>{{ text }}</p>
+  <a class="btn secondary" href="{{ url_for('home') }}">Go to Scan</a>
+</div>
+{% endblock %}

@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.db
+.env
+*.csv
+!sample_cardinal_export.csv

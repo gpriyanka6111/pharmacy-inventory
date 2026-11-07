@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Your account · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="narrow" style="margin-top:1rem">
+  <p class="muted">Signed in as {{ user.login }} ({{ 'owner' if user.role == 'owner' else 'store account' }}).</p>
+  {% if store %}
+  <h1>Store name</h1>
+  <form method="post" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="action" value="rename">
+    <div class="field"><label for="store_name">Store name</label><input id="store_name" name="store_name" maxlength="100" value="{{ store.name }}" required></div>
+    <button class="btn" type="submit">Rename store</button>
+  </form>
+  {% endif %}
+  <h1>Change your password</h1>
+  <form method="post" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="current">Current password</label><input id="current" name="current" type="password" required autocomplete="current-password"></div>
+    <div class="field"><label for="new">New password</label><input id="new" name="new" type="password" minlength="8" required autocomplete="new-password"></div>
+    <div class="field"><label for="confirm">Repeat new password</label><input id="confirm" name="confirm" type="password" minlength="8" required autocomplete="new-password"></div>
+    <button class="btn" type="submit">Change password</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: pharmacy-inventory
+    runtime: python
+    plan: free
+    region: virginia
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --timeout 60 --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL
+        sync: false          # paste your Neon connection string in the Render dashboard
+      - key: SECRET_KEY
+        generateValue: true  # Render creates a random one
+      - key: SIGNUP_CODE
+        sync: false          # the code new stores must enter to sign up; leave blank to turn sign-up off
+      - key: APP_TIMEZONE
+        value: America/New_York

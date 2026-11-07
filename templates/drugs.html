@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Drug list · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Drug list</h1>
+    <p class="muted">{{ '{:,}'.format(total) }} drugs from your Cardinal Health data, shared by all stores.</p>
+  </div>
+</div>
+
+<form class="filters" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by drug, generic name, NDC or UPC" aria-label="Search" autofocus>
+  <button class="btn" type="submit">Search</button>
+  {% if not show_all %}<a class="btn secondary" href="{{ url_for('drugs', all=1) }}">Show all drugs</a>{% endif %}
+  <input type="hidden" name="all" value="{{ 1 if show_all else '' }}" {{ '' if show_all else 'disabled' }}>
+</form>
+
+{% if q or show_all %}
+  {% if rows %}
+  <p class="muted small">{{ '{:,}'.format(matches) }} {{ 'drugs' if show_all and not q else 'matches' }}
+    (showing {{ (page - 1) * per_page + 1 }}–{{ (page - 1) * per_page + rows|length }}). Use this when a barcode won't scan.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Drug</th><th>NDC</th><th>UPC</th><th>Size</th><th class="n">Last price</th>{% if user.role == 'store' %}<th class="n">On hand here</th><th></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for p, qty in rows %}
+        <tr>
+          <td>{{ p.description }}<span class="sub">{{ p.generic_name or '' }}</span></td>
+          <td class="num">{{ p.ndc|ndc }}</td>
+          <td class="num small">{{ p.upc or '' }}</td>
+          <td>{{ p.size or '' }}</td>
+          <td class="n">{{ '${:,.2f}'.format(p.last_unit_price) if p.last_unit_price is not none else '' }}</td>
+          {% if user.role == 'store' %}
+          <td class="n">{{ qty if qty is not none else '' }}</td>
+          <td><a class="btn small secondary" href="{{ url_for('scan', code=p.ndc) }}">Open in Scan</a></td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% set last = (matches + per_page - 1) // per_page %}
+  {% if last > 1 %}
+  <div class="row" style="margin-top:1rem">
+    {% if page > 1 %}<a class="btn secondary" href="{{ url_for('drugs', q=q, all=1 if show_all else None, page=page - 1) }}">Previous</a>{% endif %}
+    <span class="muted">Page {{ page }} of {{ last }}</span>
+    {% if page < last %}<a class="btn secondary" href="{{ url_for('drugs', q=q, all=1 if show_all else None, page=page + 1) }}">Next</a>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+    <div class="panel"><p style="margin:0">No drugs match “{{ q }}”. You can add a missing drug by scanning it on the Scan page.</p></div>
+  {% endif %}
+{% endif %}
+{% endblock %}

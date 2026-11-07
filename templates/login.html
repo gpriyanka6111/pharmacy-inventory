@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Log in · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="narrow">
+  <h1>Pharmacy Inventory</h1>
+  <p class="muted">Log in with your store's username.</p>
+  <form method="post" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="login">Username</label><input id="login" name="login" required autofocus autocomplete="username"></div>
+    <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
+    <button class="btn" type="submit">Log in</button>
+  </form>
+  <p>New store? <a href="{{ url_for('signup') }}">Sign up</a></p>
+</div>
+{% endblock %}

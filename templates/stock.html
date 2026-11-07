@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Stock · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Stock at {{ store.name if store else 'your store' }}</h1>
+    <p class="muted">Quantities are in packages (bottles, boxes, kits).</p>
+  </div>
+  {% if store %}
+    <div class="row">
+      <a class="btn secondary" href="{{ url_for('export_page', store=store.id) }}">Download</a>
+    </div>
+  {% endif %}
+</div>
+
+{% if store %}
+<form class="filters" method="get">
+  {% if stores_list %}
+    <select name="store" aria-label="Store" onchange="this.form.submit()">
+      {% for s in stores_list %}<option value="{{ s.id }}" {{ 'selected' if s.id == store.id }}>{{ s.name }}</option>{% endfor %}
+    </select>
+  {% endif %}
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by drug, generic name, NDC or UPC" aria-label="Search">
+  <input type="hidden" name="show" value="{{ show }}">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<div class="filters">
+  <div class="seg" role="group" aria-label="Filter">
+    {% for key, text in [('all', 'All'), ('in', 'In stock'), ('low', 'Low stock (' ~ low_count ~ ')'), ('out', 'Out of stock')] %}
+      <a href="{{ url_for('stock', store=store.id, q=q, show=key) }}" class="{{ 'on' if show == key }}">{{ text }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="summary">
+  <div><strong>{{ rows|length }}</strong>drugs listed</div>
+  <div><strong>{{ rows|sum(attribute='0.quantity_on_hand') }}</strong>packages</div>
+  <div><strong>${{ '{:,.2f}'.format(total_value) }}</strong>stock value at last price</div>
+</div>
+
+{% if rows %}
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Drug</th><th>NDC</th><th>Size</th><th class="n">On hand</th><th class="n">Low-stock level</th><th class="n">Unit price</th><th>Price date</th><th class="n">Value</th><th>Updated</th>
+    </tr></thead>
+    <tbody>
+    {% for inv, p in rows %}
+      {% set is_low = inv.min_qty and inv.quantity_on_hand <= inv.min_qty %}
+      <tr class="{{ 'low' if is_low }}">
+        <td>{{ p.description }}<span class="sub">{{ p.generic_name or '' }}</span></td>
+        <td class="num">{{ p.ndc|ndc }}</td>
+        <td>{{ p.size or '' }}</td>
+        <td class="n">
+          {{ inv.quantity_on_hand }}
+          {% if inv.quantity_on_hand == 0 %}<span class="tag out">Out</span>{% elif is_low %}<span class="tag low">Low</span>{% endif %}
+        </td>
+        <td class="n">
+          {% if can_edit_min %}
+            <form method="post" action="{{ url_for('set_min') }}" class="row" style="justify-content:flex-end;gap:.35rem;flex-wrap:nowrap">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="store" value="{{ store.id }}">
+              <input type="hidden" name="ndc" value="{{ p.ndc }}">
+              <input type="number" name="min_qty" value="{{ inv.min_qty }}" min="0" style="width:5.5rem" aria-label="Low-stock level for {{ p.description }}">
+              <button class="btn small secondary" type="submit">Set</button>
+            </form>
+          {% else %}{{ inv.min_qty or '' }}{% endif %}
+        </td>
+        <td class="n">{{ '${:,.2f}'.format(p.last_unit_price) if p.last_unit_price is not none else '' }}</td>
+        <td class="num small">{{ p.last_invoice_date.isoformat() if p.last_invoice_date else '' }}</td>
+        <td class="n">${{ '{:,.2f}'.format(inv.quantity_on_hand * (p.last_unit_price or 0)) }}</td>
+        <td class="small muted">{{ inv.last_updated|local('%b %d, %H:%M') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="panel">
+    {% if q or show != 'all' %}
+      <p style="margin:0">No drugs match. <a href="{{ url_for('stock', store=store.id) }}">Clear the search</a>.</p>
+    {% else %}
+      <p style="margin:0">No stock recorded here yet. <a href="{{ url_for('scan') }}">Scan your first bottle</a> to add it.</p>
+    {% endif %}
+  </div>
+{% endif %}
+{% else %}
+  <div class="panel"><p style="margin:0">No store yet.</p></div>
+{% endif %}
+{% endblock %}

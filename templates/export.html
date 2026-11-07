@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Download · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="narrow" style="margin-top:1rem">
+  <h1>Download inventory report</h1>
+  <p class="muted">An Excel workbook with the inventory count (ready to print and sign) and a scan log for the period you pick. Dates use your store's time zone.</p>
+  <form method="get" action="{{ url_for('export_inventory_report') }}" class="panel" id="export-form">
+    {% if stores_list %}
+    <div class="field">
+      <label for="store">Store</label>
+      <select id="store" name="store">
+        <option value="all" {{ 'selected' if selected == 'all' }}>All stores</option>
+        {% for s in stores_list %}<option value="{{ s.id }}" {{ 'selected' if selected == s.id|string }}>{{ s.name }}</option>{% endfor %}
+      </select>
+    </div>
+    {% else %}
+      <input type="hidden" name="store" value="{{ selected }}">
+    {% endif %}
+    <div class="field">
+      <label for="period">Period</label>
+      <select id="period" name="period">
+        {% for key, text in periods %}<option value="{{ key }}" {{ 'selected' if key == period }}>{{ text }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="row" id="custom-dates" style="margin-bottom:1rem">
+      <div class="field"><label for="from">From</label><input id="from" name="from" type="date" value="{{ start }}"></div>
+      <div class="field"><label for="to">To</label><input id="to" name="to" type="date" value="{{ end }}"></div>
+    </div>
+    <button class="btn" type="submit">Download inventory report</button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var sel = document.getElementById("period"), box = document.getElementById("custom-dates");
+  var from = document.getElementById("from"), to = document.getElementById("to");
+  function sync() {
+    var custom = sel.value === "custom";
+    box.hidden = !custom;
+    from.disabled = to.disabled = !custom;      // only sent for a custom period
+  }
+  sel.addEventListener("change", sync);
+  sync();
+})();
+</script>
+{% endblock %}

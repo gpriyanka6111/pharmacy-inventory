@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Set up · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="narrow">
+  <h1>Create the owner account</h1>
+  <p class="muted">This is the first login for the app. The owner sees every store. Each store then signs up for its own account.</p>
+  <form method="post" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="name">Your name</label><input id="name" name="name" required autofocus></div>
+    <div class="field"><label for="login">Username</label><input id="login" name="login" required autocomplete="username"></div>
+    <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" minlength="8" required autocomplete="new-password"></div>
+    <div class="field"><label for="confirm">Repeat password</label><input id="confirm" name="confirm" type="password" minlength="8" required autocomplete="new-password"></div>
+    <button class="btn" type="submit">Create owner account</button>
+  </form>
+</div>
+{% endblock %}

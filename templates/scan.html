@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Scan · Pharmacy Inventory{% endblock %}
+{% block content %}
+{% if not store_id %}
+  <div class="narrow">
+    <h1>No store to scan for</h1>
+    <p>Your account isn't linked to a store. Ask the owner for help.</p>
+  </div>
+{% else %}
+<div class="scan-layout" id="scan-layout" data-counting="{{ 1 if count_session else 0 }}">
+  <section>
+    {% if count_session %}
+    <div class="banner amber" role="status">
+      <span>Count in progress, started {{ count_session.started_at|local('%b %d, %H:%M') }} by {{ count_session.started_by }}. Scans add to the count.</span>
+      <button type="button" class="btn small secondary" id="undo-btn">Undo my last count</button>
+    </div>
+    {% endif %}
+    <div class="scanbox">
+      <div class="row" style="margin-bottom:1rem">
+        <div class="field">
+          <label for="by">Your name <span class="muted" style="font-weight:400">({{ 'required for counting' if count_session else 'optional' }})</span></label>
+          <input id="by" maxlength="40" autocomplete="off" placeholder="Who is scanning? Saved with each change">
+        </div>
+        {% if count_session %}
+        <div class="field">
+          <label for="loc">Location <span class="muted" style="font-weight:400">(optional)</span></label>
+          <input id="loc" maxlength="100" autocomplete="off" placeholder="e.g. Shelf 3, back room">
+        </div>
+        {% endif %}
+      </div>
+      <form id="scan-form" autocomplete="off">
+        <label for="code">Scan a barcode</label>
+        <input id="code" name="code" inputmode="numeric" autofocus placeholder="Scan the bottle, or type a UPC or NDC">
+        <p class="hint">Press Enter after typing. Scanners press Enter for you.</p>
+      </form>
+      <div class="mode" role="group" aria-label="What are you doing?">
+        <div class="seg" id="mode">
+          {% if count_session %}
+          <button type="button" data-mode="counting" class="on">Count</button>
+          {% else %}
+          <button type="button" data-mode="received" class="on">Receive</button>
+          <button type="button" data-mode="dispensed">Dispense</button>
+          <button type="button" data-mode="count">Count</button>
+          {% endif %}
+        </div>
+        <span class="muted small" id="mode-help">Adds packages to stock.</span>
+      </div>
+    </div>
+
+    <div class="result-msg" id="msg" hidden role="status" aria-live="polite"></div>
+
+    <article class="label-card" id="card" hidden aria-live="polite">
+      <div class="label-top">
+        <div>
+          <div class="drug" id="p-desc"></div>
+          <div class="generic" id="p-generic"></div>
+        </div>
+        <div class="onhand">
+          <div class="count" id="p-onhand">0</div>
+          <div class="what">packages on hand</div>
+        </div>
+      </div>
+      <dl class="facts">
+        <div><dt>NDC</dt><dd id="p-ndc"></dd></div>
+        <div><dt>Size</dt><dd id="p-size"></dd></div>
+        <div><dt>Package size</dt><dd id="p-pkg"></dd></div>
+        <div><dt>Type</dt><dd id="p-type"></dd></div>
+        <div><dt>Last price</dt><dd><span id="p-price"></span><span class="note" id="p-price-note"></span></dd></div>
+        <div><dt>Stock last updated</dt><dd><span id="p-updated"></span><span class="note" id="p-updated-by"></span></dd></div>
+      </dl>
+      <div class="lotline" id="p-lot" hidden></div>
+      <div class="tally" id="p-tally" hidden></div>
+      <form class="qtyline" id="qty-form" autocomplete="off">
+        <div class="field">
+          <label for="qty" id="qty-label">Packages received</label>
+          <input id="qty" type="number" min="0" step="1" value="1" inputmode="numeric" required>
+        </div>
+        <div class="field note">
+          <label for="note">Note <span class="muted" style="font-weight:400">(optional)</span></label>
+          <input id="note" maxlength="255" placeholder="e.g. invoice number, Rx number">
+        </div>
+        <button class="btn" type="submit" id="save-btn">Add to stock</button>
+        <button class="btn secondary" type="button" id="cancel-btn">Cancel</button>
+      </form>
+    </article>
+
+    <section class="newdrug" id="newdrug" hidden>
+      <h2>This barcode isn't in the drug list</h2>
+      <p class="muted small">Check the NDC on the label and add the drug. It's then available to every store.</p>
+      <form id="new-form" autocomplete="off">
+        <div class="row">
+          <div class="field"><label for="n-ndc">NDC (11 digits)</label><input id="n-ndc" required placeholder="00074-0554-02"></div>
+          <div class="field"><label for="n-upc">Barcode scanned</label><input id="n-upc" readonly></div>
+        </div>
+        <div class="field" style="margin-top:1rem"><label for="n-desc">Drug name and strength</label><input id="n-desc" required placeholder="e.g. METFORMIN TB 500MG 100"></div>
+        <div class="row">
+          <div class="field"><label for="n-generic">Generic name</label><input id="n-generic"></div>
+          <div class="field"><label for="n-size">Size</label><input id="n-size" placeholder="100 EA"></div>
+          <div class="field"><label for="n-pkg">Package size</label><input id="n-pkg" type="number" step="any" min="0" placeholder="100"></div>
+          <div class="field"><label for="n-type">Type</label>
+            <select id="n-type"><option>Generic Drug</option><option>Branded Drug</option><option>Non Drug - Consumer Item</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:1rem">
+          <button class="btn" type="submit">Add drug</button>
+          <button class="btn secondary" type="button" id="new-cancel">Cancel</button>
+        </div>
+      </form>
+    </section>
+  </section>
+
+  <aside class="panel recent">
+    <h2>Latest at {{ working_store.name }}</h2>
+    <ul id="recent"><li class="empty">Nothing scanned yet.</li></ul>
+    <p class="small" style="margin:.75rem 0 0"><a href="{{ url_for('history') }}">See all history</a></p>
+  </aside>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if store_id %}<script src="{{ url_for('static', filename='scan.js') }}"></script>{% endif %}
+{% endblock %}

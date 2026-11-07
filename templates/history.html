@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}History · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>History at {{ store.name if store else 'your store' }}</h1>
+    <p class="muted">Every stock change, who made it, and when. Showing the latest 300.</p>
+  </div>
+  {% if store %}<a class="btn secondary" href="{{ url_for('export_page', store=store.id) }}">Download</a>{% endif %}
+</div>
+
+{% if store %}
+<form class="filters" method="get">
+  {% if stores_list %}
+    <select name="store" aria-label="Store">
+      {% for s in stores_list %}<option value="{{ s.id }}" {{ 'selected' if s.id == store.id }}>{{ s.name }}</option>{% endfor %}
+    </select>
+  {% endif %}
+  <select name="reason" aria-label="Type of change">
+    {% for key, text in [('', 'All changes'), ('received', 'Received'), ('dispensed', 'Dispensed'), ('adjusted', 'Counts'), ('transfer', 'Transfers')] %}
+      <option value="{{ key }}" {{ 'selected' if reason == key }}>{{ text }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn" type="submit">Show</button>
+</form>
+
+{% if rows %}
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>When</th><th>Drug</th><th class="n">Change</th><th>Type</th><th>By</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for t, desc, who in rows %}
+      <tr>
+        <td class="num small">{{ t.created_at|local }}</td>
+        <td>{{ desc }}<span class="sub num">{{ t.ndc|ndc }}</span></td>
+        <td class="n {{ 'chg-pos' if t.change > 0 else 'chg-neg' }}">{{ '+' if t.change > 0 }}{{ t.change }}</td>
+        <td>{{ {'received': 'Received', 'dispensed': 'Dispensed', 'adjusted': 'Count', 'transfer': 'Transfer'}.get(t.reason, t.reason) }}</td>
+        <td>{{ who or '' }}</td>
+        <td class="small">{{ t.note or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="panel"><p style="margin:0">No changes recorded{{ ' of this type' if reason }} yet.</p></div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign up · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="narrow">
+  <h1>Sign up your store</h1>
+  {% if disabled %}
+    <div class="panel"><p style="margin:0">Sign-up is turned off. Ask the owner for access.</p></div>
+    <p><a href="{{ url_for('login') }}">Back to log in</a></p>
+  {% else %}
+  <p class="muted">Each store has its own account. You need the sign-up code from the owner.</p>
+  <form method="post" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="store_name">Store name</label><input id="store_name" name="store_name" maxlength="100" required autofocus value="{{ request.form.get('store_name', '') }}"></div>
+    <div class="field"><label for="login">Username</label><input id="login" name="login" maxlength="100" required autocomplete="username" value="{{ request.form.get('login', '') }}"></div>
+    <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" minlength="8" required autocomplete="new-password"></div>
+    <div class="field"><label for="confirm">Repeat password</label><input id="confirm" name="confirm" type="password" minlength="8" required autocomplete="new-password"></div>
+    <div class="field"><label for="code">Sign-up code</label><input id="code" name="code" type="password" required autocomplete="off"></div>
+    <button class="btn" type="submit">Create account</button>
+  </form>
+  <p><a href="{{ url_for('login') }}">Already have an account? Log in</a></p>
+  {% endif %}
+</div>
+{% endblock %}

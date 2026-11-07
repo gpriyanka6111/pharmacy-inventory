@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Count day · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Count day{% if store %} at {{ store.name }}{% endif %}</h1>
+    <p class="muted">Several people can count the same store at the same time. Every scan adds to the count, and stock only changes when you finalize.</p>
+  </div>
+  {% if stores_list %}
+  <form method="get" class="filters" style="margin:0">
+    <select name="store" aria-label="Store" onchange="this.form.submit()">
+      {% for s in stores_list %}<option value="{{ s.id }}" {{ 'selected' if store and s.id == store.id }}>{{ s.name }}</option>{% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+
+{% if not store %}
+  <div class="panel"><p style="margin:0">No store to count yet.</p></div>
+{% else %}
+
+<div class="panel" style="max-width:26rem">
+  <div class="field" style="margin:0">
+    <label for="count-name">Your name</label>
+    <input id="count-name" maxlength="40" autocomplete="off" placeholder="Needed to start, finalize, edit or cancel">
+  </div>
+</div>
+
+{% if done %}
+<div class="panel" style="border-left:4px solid var(--green)">
+  <h2>Count finalized</h2>
+  <div class="summary">
+    <div><strong>{{ done.changed_count or 0 }}</strong>drugs changed</div>
+    <div><strong>${{ '{:,.2f}'.format(done.value_before or 0) }}</strong>stock value before</div>
+    <div><strong>${{ '{:,.2f}'.format(done.value_after or 0) }}</strong>stock value after</div>
+  </div>
+  {% set d = done.finalized_at|local('%Y-%m-%d') %}
+  <a class="btn" href="{{ url_for('export_page', store=store.id, period='custom', **{'from': d, 'to': d}) }}">Download inventory report</a>
+</div>
+{% endif %}
+
+{% if not sess %}
+<div class="panel">
+  <h2>Start a count</h2>
+  <p>Every scan adds to the count. Stock changes only when you finalize.</p>
+  <p class="muted small">While a count is open, receiving and dispensing are paused for this store.</p>
+  <form method="post" action="{{ url_for('count_start') }}" class="needs-name">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="store" value="{{ store.id }}">
+    <input type="hidden" name="name" class="fill-name">
+    <button class="btn" type="submit">Start count</button>
+  </form>
+</div>
+{% if past %}
+<div class="panel">
+  <h2>Earlier counts</h2>
+  <ul class="plain">
+    {% for c in past %}
+      <li>{{ c.finalized_at|local('%b %d, %Y %H:%M') if c.finalized_at else '' }}:
+        {{ 'Finalized' if c.status == 'finalized' else 'Cancelled' }}, started by {{ c.started_by }}
+        {% if c.status == 'finalized' %}({{ c.changed_count or 0 }} drugs changed)
+          {% set d = c.finalized_at|local('%Y-%m-%d') %}
+          <a href="{{ url_for('export_page', store=store.id, period='custom', **{'from': d, 'to': d}) }}">report</a>
+        {% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% else %}
+<div class="banner amber" role="status">
+  Count in progress, started {{ sess.started_at|local('%b %d, %H:%M') }} by {{ sess.started_by }}. Scans add to the count.
+  {% if user.role == 'store' %}<a href="{{ url_for('scan') }}">Go to Scan</a>{% endif %}
+</div>
+
+<div class="summary">
+  <div><strong>{{ rev.drugs_counted }}</strong>drugs counted</div>
+  <div><strong>${{ '{:,.2f}'.format(rev.value) }}</strong>inventory value at counted quantities</div>
+  <div><strong>{{ rev.will_change }}</strong>counted drugs differ from stock</div>
+  <div><strong>{{ rev.uncounted_total }}</strong>in stock, not counted</div>
+</div>
+
+<div class="panel">
+  <form method="post" action="{{ url_for('count_finalize', session_id=sess.id) }}" class="needs-name" id="finalize-form"
+        data-changes="{{ rev.will_change }}" data-uncounted="{{ rev.uncounted_total }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="store" value="{{ store.id }}">
+    <input type="hidden" name="name" class="fill-name">
+    <label style="display:flex;gap:.5rem;align-items:flex-start;font-weight:400">
+      <input type="checkbox" name="set_zero" value="1" id="set-zero" checked style="margin-top:.25rem">
+      <span><strong>Set drugs that weren't counted to 0.</strong>
+        <span class="muted small" style="display:block">Anything in stock that nobody scanned is treated as gone. Untick to leave those drugs as they are.</span></span>
+    </label>
+    <div class="row" style="margin-top:1rem">
+      <button class="btn" type="submit">Finalize count</button>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('count_cancel', session_id=sess.id) }}" class="needs-name" id="cancel-form" style="margin-top:.75rem">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="store" value="{{ store.id }}">
+    <input type="hidden" name="name" class="fill-name">
+    <button class="btn secondary danger" type="submit">Cancel count</button>
+  </form>
+</div>
+
+<form class="filters" method="get">
+  {% if stores_list %}<input type="hidden" name="store" value="{{ store.id }}">{% endif %}
+  <input type="search" name="q" value="{{ q }}" placeholder="Search counted drugs by name or NDC" aria-label="Search">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<h2>Counted</h2>
+{% if rev.rows %}
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Drug</th><th>NDC</th><th class="n">Counted</th><th class="n">On hand now</th><th class="n">Difference</th><th>Counted by</th><th>Locations</th><th class="n">Entries</th></tr></thead>
+    <tbody>
+    {% for d in rev.rows %}
+      <tr class="clickable" data-target="e-{{ d.product.ndc }}" tabindex="0" title="Click to see every entry">
+        <td>{{ d.product.description }}</td>
+        <td class="num">{{ d.product.ndc|ndc }}</td>
+        <td class="n"><strong>{{ d.total }}</strong></td>
+        <td class="n">{{ d.on_hand }}</td>
+        <td class="n">{% if d.diff < 0 %}<span class="tag out">{{ d.diff }}</span>{% elif d.diff > 0 %}<span class="tag low">+{{ d.diff }}</span>{% else %}0{% endif %}</td>
+        <td>{{ d.names|join(', ') }}</td>
+        <td>{{ d.locations|join(', ') }}</td>
+        <td class="n">{{ d.entries|length }}</td>
+      </tr>
+      <tr id="e-{{ d.product.ndc }}" hidden>
+        <td colspan="8" style="background:var(--green-tint)">
+          <table>
+            <thead><tr><th>Time</th><th>Person</th><th>Location</th><th class="n">Qty</th><th>Edit</th><th>Log</th></tr></thead>
+            <tbody>
+            {% for e in d.entries %}
+              <tr>
+                <td class="num small">{{ e.created_at|local('%b %d %H:%M:%S') }}</td>
+                <td>{{ e.counted_by }}</td>
+                <td>{{ e.location or '' }}</td>
+                <td class="n">{{ e.qty }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('count_entry_edit', entry_id=e.id) }}" class="row needs-name" style="gap:.35rem;flex-wrap:nowrap">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="store" value="{{ store.id }}">
+                    <input type="hidden" name="name" class="fill-name">
+                    <input type="number" name="qty" value="{{ e.qty }}" min="0" style="width:5rem" aria-label="Quantity">
+                    <input name="location" value="{{ e.location or '' }}" placeholder="Location" maxlength="100" style="width:8rem" aria-label="Location">
+                    <button class="btn small secondary" type="submit">Save</button>
+                  </form>
+                  <form method="post" action="{{ url_for('count_entry_delete', entry_id=e.id) }}" class="needs-name confirm-delete" style="margin-top:.25rem">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="store" value="{{ store.id }}">
+                    <input type="hidden" name="name" class="fill-name">
+                    <button class="btn small danger" type="submit">Delete</button>
+                  </form>
+                </td>
+                <td class="small muted">{{ e.edit_note or '' }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="panel"><p style="margin:0">{{ 'No counted drugs match.' if q else 'Nothing counted yet. Scan a bottle to add to the count.' }}</p></div>
+{% endif %}
+
+<h2 style="margin-top:1.5rem">In stock but not counted</h2>
+{% if rev.uncounted %}
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Drug</th><th>NDC</th><th class="n">On hand</th></tr></thead>
+    <tbody>
+    {% for p, n in rev.uncounted %}
+      <tr><td>{{ p.description }}</td><td class="num">{{ p.ndc|ndc }}</td><td class="n">{{ n }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="panel"><p style="margin:0">Every drug that is in stock has been counted.</p></div>
+{% endif %}
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var nameBox = document.getElementById("count-name");
+  if (!nameBox) return;
+  try { nameBox.value = localStorage.getItem("scanName") || ""; } catch (e) {}
+  nameBox.addEventListener("input", function () {
+    try { localStorage.setItem("scanName", nameBox.value.trim()); } catch (e) {}
+  });
+  document.querySelectorAll("form.needs-name").forEach(function (f) {
+    f.addEventListener("submit", function (ev) {
+      var name = nameBox.value.trim();
+      if (!name) { ev.preventDefault(); alert("Enter your name first (the Your name box at the top)."); nameBox.focus(); return; }
+      f.querySelector(".fill-name").value = name;
+    });
+  });
+  var fin = document.getElementById("finalize-form");
+  if (fin) fin.addEventListener("submit", function (ev) {
+    if (ev.defaultPrevented) return;
+    var zero = document.getElementById("set-zero").checked, n = +fin.dataset.changes, u = +fin.dataset.uncounted;
+    var msg = "Finalize this count?\n\n" + n + " counted drug" + (n === 1 ? "" : "s") + " will change.\n" +
+      (zero ? u + " uncounted drug" + (u === 1 ? "" : "s") + " will be set to 0." : "Uncounted drugs will be left as they are.") +
+      "\n\nThis updates stock and can't be undone.";
+    if (!confirm(msg)) ev.preventDefault();
+  });
+  var cancel = document.getElementById("cancel-form");
+  if (cancel) cancel.addEventListener("submit", function (ev) {
+    if (ev.defaultPrevented) return;
+    if (!confirm("Cancel this count? Stock will not change. The entries are kept in the record.")) ev.preventDefault();
+  });
+  document.querySelectorAll("form.confirm-delete").forEach(function (f) {
+    f.addEventListener("submit", function (ev) { if (!ev.defaultPrevented && !confirm("Delete this entry?")) ev.preventDefault(); });
+  });
+  document.querySelectorAll("tr.clickable").forEach(function (tr) {
+    function toggle() { var t = document.getElementById(tr.dataset.target); t.hidden = !t.hidden; }
+    tr.addEventListener("click", toggle);
+    tr.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+  });
+})();
+</script>
+{% endblock %}

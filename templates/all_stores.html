@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}All stores · Pharmacy Inventory{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Stock across all stores</h1>
+    <p class="muted">Packages on hand at each store. A blank means the store has never stocked it.</p>
+  </div>
+  <a class="btn secondary" href="{{ url_for('export_page', store='all') }}">Download</a>
+</div>
+
+<div class="panel">
+  <h2>Count day</h2>
+  <ul class="plain" style="margin:0">
+    {% for s in stores_list %}
+      {% set st = count_status.get(s.id) %}
+      <li><a href="{{ url_for('count_day', store=s.id) }}">{{ s.name }}</a>:
+        {% if st and st[0] == 'open' %}<span class="tag low">In progress</span> since {{ st[1].started_at|local('%b %d, %H:%M') }}
+        {% elif st and st[0] == 'finalized' %}last finalized {{ st[1].finalized_at|ldate }}
+        {% else %}<span class="muted">no count</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<form class="filters" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by drug, generic name or NDC" aria-label="Search">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+{% if table %}
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Drug</th><th>NDC</th>
+      {% for s in stores_list %}<th class="n">{{ s.name }}</th>{% endfor %}
+      <th class="n">Total</th>
+    </tr></thead>
+    <tbody>
+    {% for row in table %}
+      <tr>
+        <td>{{ row.product.description }}<span class="sub">{{ row.product.size or '' }}</span></td>
+        <td class="num">{{ row.product.ndc|ndc }}</td>
+        {% for s in stores_list %}
+          {% set n = row.qty.get(s.id) %}
+          <td class="n">{% if n is none %}<span class="muted">·</span>{% elif n == 0 %}<span class="tag out">0</span>{% else %}{{ n }}{% endif %}</td>
+        {% endfor %}
+        <td class="n"><strong>{{ row.total }}</strong></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="panel"><p style="margin:0">{% if q %}No drugs match. <a href="{{ url_for('all_stores') }}">Clear the search</a>.{% else %}No stock recorded at any store yet.{% endif %}</p></div>
+{% endif %}
+{% endblock %}
